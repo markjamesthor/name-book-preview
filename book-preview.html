@@ -191,6 +191,11 @@
     overflow: hidden;
   }
 
+  /* Blurred backdrop (hidden on desktop, shown on mobile) */
+  .page-bg-blur {
+    display: none;
+  }
+
   .page-bg-img {
     position: absolute;
     top: 0; left: 0;
@@ -393,6 +398,21 @@
 
     #page-viewer {
       border-radius: 10px;
+    }
+
+    /* Blurred backdrop + contain for full illustration on mobile */
+    .page-bg-blur {
+      display: block;
+      position: absolute;
+      top: -30px; left: -30px; right: -30px; bottom: -30px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(30px) brightness(0.35);
+      z-index: 0;
+    }
+    .carousel-slide .page-bg-img {
+      object-fit: contain;
+      z-index: 1;
     }
 
     /* Hide desktop nav arrows */

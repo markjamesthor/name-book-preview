@@ -147,7 +147,8 @@ function buildSlideContent(pageIndex) {
   let bgHtml = '';
   if (page.illustration && config.illustrations[page.illustration]) {
     const imgPath = config.illustrations[page.illustration];
-    bgHtml = `<img class="page-bg-img" src="${imgPath}" alt="${page.title}" />`;
+    bgHtml = `<div class="page-bg-blur" style="background-image:url('${imgPath}')"></div>
+      <img class="page-bg-img" src="${imgPath}" alt="${page.title}" />`;
   } else if (page.bgGradient) {
     bgHtml = `<div class="page-bg-gradient" style="background:${page.bgGradient}"></div>`;
   }
