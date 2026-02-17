@@ -191,6 +191,13 @@
     overflow: hidden;
   }
 
+  /* Image wrapper — fills slide on desktop */
+  .slide-img-wrap {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
   /* Blurred backdrop (hidden on desktop, shown on mobile) */
   .page-bg-blur {
     display: none;
@@ -208,7 +215,7 @@
     width: 100%; height: 100%;
   }
 
-  /* Text overlay */
+  /* Text overlay — on desktop, overlays the image */
   .page-text-overlay {
     position: absolute;
     left: 0; right: 0;
@@ -400,7 +407,19 @@
       border-radius: 10px;
     }
 
-    /* Blurred backdrop + contain for full illustration on mobile */
+    /* Mobile: separate image and text vertically */
+    .carousel-slide {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slide-img-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Blurred backdrop + contain for full illustration */
     .page-bg-blur {
       display: block;
       position: absolute;
@@ -410,9 +429,23 @@
       filter: blur(30px) brightness(0.35);
       z-index: 0;
     }
-    .carousel-slide .page-bg-img {
+    .slide-img-wrap .page-bg-img {
       object-fit: contain;
       z-index: 1;
+    }
+
+    /* Text as separate block below image */
+    .carousel-slide .page-text-overlay {
+      position: relative;
+      top: auto; bottom: auto;
+      transform: none;
+      flex-shrink: 0;
+      background: #16162a;
+      padding: 14px 20px;
+      max-height: 42%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      border-top: 1px solid #2a2a4a;
     }
 
     /* Hide desktop nav arrows */

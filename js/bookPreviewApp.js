@@ -144,13 +144,13 @@ function buildSlideContent(pageIndex) {
   if (pageIndex < 0 || pageIndex >= pages.length) return '';
 
   const page = pages[pageIndex];
-  let bgHtml = '';
+  let imgContent = '';
   if (page.illustration && config.illustrations[page.illustration]) {
     const imgPath = config.illustrations[page.illustration];
-    bgHtml = `<div class="page-bg-blur" style="background-image:url('${imgPath}')"></div>
+    imgContent = `<div class="page-bg-blur" style="background-image:url('${imgPath}')"></div>
       <img class="page-bg-img" src="${imgPath}" alt="${page.title}" />`;
   } else if (page.bgGradient) {
-    bgHtml = `<div class="page-bg-gradient" style="background:${page.bgGradient}"></div>`;
+    imgContent = `<div class="page-bg-gradient" style="background:${page.bgGradient}"></div>`;
   }
 
   const text = substituteVars(page.text, variables);
@@ -158,7 +158,7 @@ function buildSlideContent(pageIndex) {
   const posClass = `text-pos-${page.textPosition || 'center'}`;
 
   return `
-    ${bgHtml}
+    <div class="slide-img-wrap">${imgContent}</div>
     <div class="page-text-overlay ${posClass}" style="color:${textColor}">
       <div class="page-story-text">${text.replace(/\n/g, '<br>')}</div>
     </div>`;
