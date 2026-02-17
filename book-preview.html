@@ -433,15 +433,6 @@
     .slide-img-wrap .page-bg-img {
       object-fit: contain;
       z-index: 1;
-      /* Soft edge fade into blur background */
-      -webkit-mask-image:
-        linear-gradient(to right, transparent, black 6%, black 94%, transparent),
-        linear-gradient(to bottom, black 3%, black 90%, transparent);
-      -webkit-mask-composite: destination-in;
-      mask-image:
-        linear-gradient(to right, transparent, black 6%, black 94%, transparent),
-        linear-gradient(to bottom, black 3%, black 90%, transparent);
-      mask-composite: intersect;
     }
 
     /* Text as separate block below image */
