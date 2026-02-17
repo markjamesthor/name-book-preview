@@ -184,7 +184,14 @@
     width: 100%; height: 100%;
   }
 
-  /* Text overlay */
+  /* Scroll content wrapper */
+  .page-scroll-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Text overlay — inside scroll content, moves with image */
   .page-text-overlay {
     position: absolute;
     left: 0; right: 0;
@@ -197,24 +204,21 @@
   .text-pos-center { top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.35); }
   .text-pos-bottom { bottom: 0; background: linear-gradient(0deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.3) 70%, transparent 100%); }
 
-  .scene-badge {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    padding: 3px 10px;
-    border-radius: 20px;
-    background: rgba(0,0,0,0.4);
-    color: rgba(255,255,255,0.7);
-    margin-bottom: 12px;
-    backdrop-filter: blur(4px);
-  }
   .page-story-text {
     font-family: 'Noto Serif KR', 'RIDIBatang', 'Batang', serif;
     font-size: 16px;
     line-height: 2.2;
     text-shadow: 0 1px 6px rgba(0,0,0,0.7);
     word-break: keep-all;
+  }
+
+  /* Page transition animation */
+  @keyframes pageFadeIn {
+    from { opacity: 0; transform: scale(1.02); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .page-fade-in {
+    animation: pageFadeIn 0.4s ease-out;
   }
 
   /* Desktop nav arrows (below viewer) */
@@ -427,12 +431,25 @@
     .page-scroll-area::-webkit-scrollbar { display: none; }
     .page-scroll-area { scrollbar-width: none; }
 
+    .page-scroll-content {
+      width: auto;
+      height: 100%;
+      display: inline-block;
+      min-width: 100%;
+    }
+
     .page-scroll-area .page-bg-img {
       position: relative;
       width: auto;
       height: 100%;
       max-width: none;
       display: block;
+    }
+
+    /* Text overlay spans the full image width on mobile */
+    .page-scroll-area .page-text-overlay {
+      left: 0; right: 0;
+      min-width: 100%;
     }
 
     /* Edge hints visible on mobile */
@@ -444,7 +461,6 @@
 
     /* Mobile text sizing */
     .page-text-overlay { padding: 16px 20px; }
-    .scene-badge { font-size: 9px; margin-bottom: 8px; }
     .page-story-text { font-size: 13px; line-height: 2.0; }
 
     /* ===== Mobile Nav Bar ===== */

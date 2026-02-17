@@ -167,9 +167,11 @@ function renderPage() {
 
   // Build illustration or gradient background inside scroll area
   let bgHtml = '';
+  let hasImage = false;
   if (page.illustration && config.illustrations[page.illustration]) {
     const imgPath = config.illustrations[page.illustration];
     bgHtml = `<img class="page-bg-img" src="${imgPath}" alt="${page.title}" />`;
+    hasImage = true;
   } else if (page.bgGradient) {
     bgHtml = `<div class="page-bg-gradient" style="background:${page.bgGradient}"></div>`;
   }
@@ -177,16 +179,22 @@ function renderPage() {
   const text = substituteVars(page.text, variables);
   const textColor = page.textColor || 'white';
   const posClass = `text-pos-${page.textPosition || 'center'}`;
-  const sceneBadge = `<span class="scene-badge">${page.scene}. ${page.title}</span>`;
 
   const canPrev = currentPageIndex > 0;
   const canNext = currentPageIndex < pages.length - 1;
 
-  viewer.innerHTML = `
-    <div class="page-scroll-area">${bgHtml}</div>
+  // Text overlay goes INSIDE scroll content so it moves with the image
+  const textOverlay = `
     <div class="page-text-overlay ${posClass}" style="color:${textColor}">
-      ${sceneBadge}
       <div class="page-story-text">${text.replace(/\n/g, '<br>')}</div>
+    </div>`;
+
+  viewer.innerHTML = `
+    <div class="page-scroll-area">
+      <div class="page-scroll-content page-fade-in">
+        ${bgHtml}
+        ${textOverlay}
+      </div>
     </div>
     <div class="edge-hint edge-hint-left" id="edge-left">
       <span class="edge-hint-icon">${canPrev ? '◀' : ''}</span>
