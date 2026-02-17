@@ -5,46 +5,32 @@
 
 // ========== Korean Language Helpers ==========
 
-/** 한글 유니코드 범위: 0xAC00 ~ 0xD7A3 */
 function hasBatchim(char) {
   const code = char.charCodeAt(0);
   if (code < 0xAC00 || code > 0xD7A3) return false;
   return (code - 0xAC00) % 28 !== 0;
 }
 
-/** 이름의 마지막 글자에 받침이 있는지 */
 function nameHasBatchim(name) {
   if (!name || name.length === 0) return false;
   return hasBatchim(name[name.length - 1]);
 }
 
-/**
- * 이름 → 캐주얼 호칭 (받침 있으면 +이, 없으면 그대로)
- * 도현 → 도현이, 지수 → 지수
- */
 function casualName(firstName) {
   return nameHasBatchim(firstName) ? firstName + '이' : firstName;
 }
 
-/**
- * 한글 자모 분해 (초성, 중성, 종성)
- * "도현" → "ㄷ, ㅗ, ㅎ, ㅕ, ㄴ"
- */
 function decomposeKorean(str) {
   const CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
   const JUNG = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
   const JONG = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
-
   const letters = [];
   for (const ch of str) {
     const code = ch.charCodeAt(0);
     if (code >= 0xAC00 && code <= 0xD7A3) {
       const offset = code - 0xAC00;
-      const cho = Math.floor(offset / (21 * 28));
-      const jung = Math.floor((offset % (21 * 28)) / 28);
-      const jong = offset % 28;
-      letters.push(CHO[cho], JUNG[jung]);
-      if (jong !== 0) letters.push(JONG[jong]);
+      letters.push(CHO[Math.floor(offset / (21 * 28))], JUNG[Math.floor((offset % (21 * 28)) / 28)]);
+      if (offset % 28 !== 0) letters.push(JONG[offset % 28]);
     } else {
       letters.push(ch);
     }
@@ -54,13 +40,6 @@ function decomposeKorean(str) {
 
 // ========== Variable Substitution ==========
 
-/**
- * 텍스트의 {변수} 치환
- * {name} → 캐주얼 호칭 (도현이/지수)
- * {firstName} → 원래 이름 (도현/지수)
- * {parentNames} → 부모 호칭 (엄마 아빠)
- * {nameLetters} → 자모 분해 (ㄷ, ㅗ, ㅎ, ㅕ, ㄴ)
- */
 function substituteVars(text, vars) {
   if (!text) return '';
   return text
@@ -80,17 +59,39 @@ let variables = {};
 const els = {};
 
 function cacheDom() {
+  // Desktop inputs
   els.firstNameInput = document.getElementById('input-firstName');
   els.parentNamesInput = document.getElementById('input-parentNames');
+  // Mobile inputs
+  els.mFirstNameInput = document.getElementById('m-input-firstName');
+  els.mParentNamesInput = document.getElementById('m-input-parentNames');
+  // Version buttons (both desktop + mobile)
   els.versionBtns = document.querySelectorAll('.version-btn');
+  // Viewer
   els.pageViewer = document.getElementById('page-viewer');
+  // Desktop info
   els.pageTitle = document.getElementById('page-title');
   els.pageCounter = document.getElementById('page-counter');
   els.pageCounterBottom = document.getElementById('page-counter-bottom');
+  // Mobile info
+  els.mPageTitle = document.getElementById('m-page-title');
+  els.mPageCounter = document.getElementById('m-page-counter');
+  // Desktop nav
   els.prevBtn = document.getElementById('btn-prev');
   els.nextBtn = document.getElementById('btn-next');
+  // Mobile nav
+  els.mPrevBtn = document.getElementById('m-btn-prev');
+  els.mNextBtn = document.getElementById('m-btn-next');
+  // Touch zones
+  els.touchPrev = document.getElementById('touch-prev');
+  els.touchNext = document.getElementById('touch-next');
+  // Thumbnails
   els.thumbnailStrip = document.getElementById('thumbnail-strip');
   els.versionLabel = document.getElementById('version-label');
+  // Settings bottom sheet
+  els.settingsBtn = document.getElementById('btn-settings');
+  els.settingsOverlay = document.getElementById('settings-overlay');
+  els.settingsBackdrop = document.getElementById('settings-backdrop');
 }
 
 // ========== Config Loading ==========
@@ -101,19 +102,22 @@ async function loadConfig() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     config = await resp.json();
   } catch (e) {
-    // file:// fallback: try loading via inline config if available
     if (window.__BOOK_CONFIG) {
       config = window.__BOOK_CONFIG;
     } else {
       console.error('Config load failed:', e);
-      els.pageViewer.innerHTML = '<div style="padding:40px;color:#f66;text-align:center;">Config 로드 실패. HTTP 서버를 사용하세요.<br><code>python3 -m http.server 8765</code></div>';
+      els.pageViewer.innerHTML = '<div style="padding:40px;color:#f66;text-align:center;">Config 로드 실패.<br><code>python3 -m http.server 8765</code></div>';
       return;
     }
   }
 
-  // Set defaults
-  els.firstNameInput.value = config.defaults.firstName;
-  els.parentNamesInput.value = config.defaults.parentNames;
+  // Set defaults on all inputs
+  const fn = config.defaults.firstName;
+  const pn = config.defaults.parentNames;
+  els.firstNameInput.value = fn;
+  els.parentNamesInput.value = pn;
+  els.mFirstNameInput.value = fn;
+  els.mParentNamesInput.value = pn;
 
   updateVariables();
   renderPage();
@@ -125,13 +129,34 @@ async function loadConfig() {
 function updateVariables() {
   const firstName = els.firstNameInput.value.trim() || config.defaults.firstName;
   const parentNames = els.parentNamesInput.value.trim() || config.defaults.parentNames;
-
   variables = {
     firstName,
     name: casualName(firstName),
     parentNames,
     nameLetters: decomposeKorean(firstName)
   };
+}
+
+/** Sync desktop ↔ mobile inputs */
+function syncInputs(source) {
+  if (source === 'desktop') {
+    els.mFirstNameInput.value = els.firstNameInput.value;
+    els.mParentNamesInput.value = els.parentNamesInput.value;
+  } else {
+    els.firstNameInput.value = els.mFirstNameInput.value;
+    els.parentNamesInput.value = els.mParentNamesInput.value;
+  }
+}
+
+// ========== Navigation ==========
+
+function goPage(delta) {
+  const pages = getPages();
+  const next = currentPageIndex + delta;
+  if (next >= 0 && next < pages.length) {
+    currentPageIndex = next;
+    renderPage();
+  }
 }
 
 // ========== Page Rendering ==========
@@ -148,7 +173,6 @@ function renderPage() {
   const page = pages[currentPageIndex];
   const viewer = els.pageViewer;
 
-  // Build illustration or gradient background
   let bgHtml = '';
   if (page.illustration && config.illustrations[page.illustration]) {
     const imgPath = config.illustrations[page.illustration];
@@ -157,12 +181,9 @@ function renderPage() {
     bgHtml = `<div class="page-bg-gradient" style="background:${page.bgGradient}"></div>`;
   }
 
-  // Text with variable substitution
   const text = substituteVars(page.text, variables);
   const textColor = page.textColor || 'white';
   const posClass = `text-pos-${page.textPosition || 'center'}`;
-
-  // Scene badge
   const sceneBadge = `<span class="scene-badge">${page.scene}. ${page.title}</span>`;
 
   viewer.innerHTML = `
@@ -171,25 +192,37 @@ function renderPage() {
       ${sceneBadge}
       <div class="page-story-text">${text.replace(/\n/g, '<br>')}</div>
     </div>
+    <div class="touch-zone touch-zone-left" id="touch-prev"></div>
+    <div class="touch-zone touch-zone-right" id="touch-next"></div>
   `;
 
-  // Update page info
-  els.pageTitle.textContent = `${page.scene}. ${page.title}`;
-  els.pageCounter.textContent = `${currentPageIndex + 1} / ${pages.length}`;
-  if (els.pageCounterBottom) {
-    els.pageCounterBottom.textContent = `${currentPageIndex + 1} / ${pages.length}`;
-  }
+  // Re-bind touch zones (since innerHTML replaced them)
+  document.getElementById('touch-prev')?.addEventListener('click', () => goPage(-1));
+  document.getElementById('touch-next')?.addEventListener('click', () => goPage(1));
 
-  // Navigation buttons
+  // Desktop info
+  const label = `${page.scene}. ${page.title}`;
+  const counter = `${currentPageIndex + 1} / ${pages.length}`;
+  els.pageTitle.textContent = label;
+  els.pageCounter.textContent = counter;
+  if (els.pageCounterBottom) els.pageCounterBottom.textContent = counter;
+
+  // Mobile info
+  if (els.mPageTitle) els.mPageTitle.textContent = label;
+  if (els.mPageCounter) els.mPageCounter.textContent = counter;
+
+  // Desktop nav buttons
   els.prevBtn.disabled = currentPageIndex === 0;
   els.nextBtn.disabled = currentPageIndex === pages.length - 1;
+
+  // Mobile nav buttons
+  if (els.mPrevBtn) els.mPrevBtn.disabled = currentPageIndex === 0;
+  if (els.mNextBtn) els.mNextBtn.disabled = currentPageIndex === pages.length - 1;
 
   // Highlight active thumbnail
   document.querySelectorAll('.thumb').forEach((t, i) => {
     t.classList.toggle('active', i === currentPageIndex);
   });
-
-  // Scroll active thumbnail into view
   const activeThumb = document.querySelector('.thumb.active');
   if (activeThumb) {
     activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -223,56 +256,106 @@ function renderThumbnails() {
 // ========== Event Handlers ==========
 
 function setupEvents() {
-  // Input changes → real-time update
+  // Desktop input changes
   els.firstNameInput.addEventListener('input', () => {
+    syncInputs('desktop');
     updateVariables();
     renderPage();
   });
-
   els.parentNamesInput.addEventListener('input', () => {
+    syncInputs('desktop');
     updateVariables();
     renderPage();
   });
 
-  // Version switch
+  // Mobile input changes
+  els.mFirstNameInput.addEventListener('input', () => {
+    syncInputs('mobile');
+    updateVariables();
+    renderPage();
+  });
+  els.mParentNamesInput.addEventListener('input', () => {
+    syncInputs('mobile');
+    updateVariables();
+    renderPage();
+  });
+
+  // Version switch (all buttons, desktop + mobile)
   els.versionBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       els.versionBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      // Activate both desktop and mobile buttons for this version
+      document.querySelectorAll(`.version-btn[data-version="${btn.dataset.version}"]`)
+        .forEach(b => b.classList.add('active'));
       currentVersion = btn.dataset.version;
       currentPageIndex = 0;
-      els.versionLabel.textContent = config.versions[currentVersion].label;
+      if (els.versionLabel) {
+        els.versionLabel.textContent = config.versions[currentVersion].label;
+      }
       renderPage();
       renderThumbnails();
     });
   });
 
-  // Navigation
-  els.prevBtn.addEventListener('click', () => {
-    if (currentPageIndex > 0) {
-      currentPageIndex--;
-      renderPage();
-    }
-  });
+  // Desktop nav
+  els.prevBtn.addEventListener('click', () => goPage(-1));
+  els.nextBtn.addEventListener('click', () => goPage(1));
 
-  els.nextBtn.addEventListener('click', () => {
-    const pages = getPages();
-    if (currentPageIndex < pages.length - 1) {
-      currentPageIndex++;
-      renderPage();
-    }
-  });
+  // Mobile nav
+  if (els.mPrevBtn) els.mPrevBtn.addEventListener('click', () => goPage(-1));
+  if (els.mNextBtn) els.mNextBtn.addEventListener('click', () => goPage(1));
 
   // Keyboard navigation
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
-    if (e.key === 'ArrowLeft') {
-      if (currentPageIndex > 0) { currentPageIndex--; renderPage(); }
-    } else if (e.key === 'ArrowRight') {
-      const pages = getPages();
-      if (currentPageIndex < pages.length - 1) { currentPageIndex++; renderPage(); }
-    }
+    if (e.key === 'ArrowLeft') goPage(-1);
+    else if (e.key === 'ArrowRight') goPage(1);
   });
+
+  // Settings bottom sheet
+  if (els.settingsBtn) {
+    els.settingsBtn.addEventListener('click', () => {
+      els.settingsOverlay.classList.add('open');
+    });
+  }
+  if (els.settingsBackdrop) {
+    els.settingsBackdrop.addEventListener('click', () => {
+      els.settingsOverlay.classList.remove('open');
+    });
+  }
+
+  // Swipe gestures on page viewer
+  setupSwipe();
+}
+
+// ========== Swipe Gesture ==========
+
+function setupSwipe() {
+  const viewer = els.pageViewer;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  viewer.addEventListener('touchstart', (e) => {
+    // Don't interfere with touch zones or scrolling
+    if (e.target.closest('.touch-zone')) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  viewer.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+
+    // Only horizontal swipes (dx > dy, and threshold > 40px)
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0) goPage(1);  // swipe left → next
+      else goPage(-1);         // swipe right → prev
+    }
+  }, { passive: true });
 }
 
 // ========== Init ==========
