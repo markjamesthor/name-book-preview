@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노미네 왕국 — Book Preview</title>
+<style>
+  /* ===== Reset & Base ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    background: #0f0f17;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ===== Top Bar ===== */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: #1a1a2e;
+    border-bottom: 1px solid #2a2a4a;
+    flex-shrink: 0;
+  }
+  .top-bar h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #c9a0ff;
+    letter-spacing: 0.5px;
+  }
+  .top-bar .book-info {
+    font-size: 11px;
+    color: #888;
+  }
+
+  /* ===== Main Layout ===== */
+  .main-area {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ===== Left Panel (Controls) ===== */
+  .left-panel {
+    width: 260px;
+    flex-shrink: 0;
+    background: #16162a;
+    border-right: 1px solid #2a2a4a;
+    padding: 20px 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel-section h3 {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  .input-group {
+    margin-bottom: 12px;
+  }
+  .input-group label {
+    display: block;
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 4px;
+  }
+  .input-group input {
+    width: 100%;
+    padding: 8px 10px;
+    background: #1e1e3a;
+    border: 1px solid #3a3a5a;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-group input:focus {
+    border-color: #c9a0ff;
+  }
+
+  /* Version buttons */
+  .version-switch {
+    display: flex;
+    gap: 6px;
+  }
+  .version-btn {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #3a3a5a;
+    border-radius: 6px;
+    background: #1e1e3a;
+    color: #aaa;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .version-btn:hover {
+    border-color: #c9a0ff;
+    color: #ddd;
+  }
+  .version-btn.active {
+    background: #c9a0ff;
+    color: #0f0f17;
+    border-color: #c9a0ff;
+    font-weight: 600;
+  }
+
+  .version-desc {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+  }
+
+  /* Page info in left panel */
+  .page-info-card {
+    background: #1e1e3a;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #2a2a4a;
+  }
+  .page-info-card .page-scene {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c9a0ff;
+  }
+  .page-info-card .page-counter {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  /* ===== Right Panel (Preview) ===== */
+  .right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    min-width: 0;
+  }
+
+  /* Page Viewer — 250:200 aspect ratio */
+  .page-viewer-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 750px;
+    aspect-ratio: 250 / 200;
+    max-height: calc(100vh - 200px);
+  }
+
+  #page-viewer {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.6);
+    background: #111;
+  }
+
+  /* Background image */
+  .page-bg-img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+
+  /* Background gradient (placeholder) */
+  .page-bg-gradient {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* Text overlay */
+  .page-text-overlay {
+    position: absolute;
+    left: 0; right: 0;
+    padding: 24px 40px;
+    text-align: center;
+    z-index: 10;
+    background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.3) 70%, transparent 100%);
+  }
+
+  .text-pos-top    { top: 0; }
+  .text-pos-center { top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.35); }
+  .text-pos-bottom { bottom: 0; background: linear-gradient(0deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.3) 70%, transparent 100%); }
+
+  .scene-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(0,0,0,0.4);
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 12px;
+    backdrop-filter: blur(4px);
+  }
+
+  .page-story-text {
+    font-family: 'Noto Serif KR', 'RIDIBatang', 'Batang', serif;
+    font-size: 16px;
+    line-height: 2.2;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+    word-break: keep-all;
+  }
+
+  /* Navigation arrows */
+  .nav-arrows {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .nav-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid #3a3a5a;
+    background: #1e1e3a;
+    color: #ccc;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .nav-btn:hover:not(:disabled) {
+    border-color: #c9a0ff;
+    color: #c9a0ff;
+  }
+  .nav-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .nav-page-num {
+    font-size: 12px;
+    color: #888;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  /* ===== Bottom Thumbnail Strip ===== */
+  .thumbnail-bar {
+    flex-shrink: 0;
+    background: #1a1a2e;
+    border-top: 1px solid #2a2a4a;
+    padding: 10px 16px;
+  }
+
+  #thumbnail-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-behavior: smooth;
+  }
+  #thumbnail-strip::-webkit-scrollbar {
+    height: 4px;
+  }
+  #thumbnail-strip::-webkit-scrollbar-track {
+    background: #16162a;
+    border-radius: 2px;
+  }
+  #thumbnail-strip::-webkit-scrollbar-thumb {
+    background: #3a3a5a;
+    border-radius: 2px;
+  }
+
+  .thumb {
+    flex-shrink: 0;
+    width: 80px;
+    height: 64px;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    position: relative;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .thumb:hover {
+    border-color: #5a5a8a;
+    transform: translateY(-2px);
+  }
+  .thumb.active {
+    border-color: #c9a0ff;
+    transform: translateY(-2px);
+  }
+  .thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .thumb-gradient {
+    width: 100%; height: 100%;
+  }
+  .thumb-label {
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.8);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+
+  /* ===== Keyboard Hint ===== */
+  .keyboard-hint {
+    position: absolute;
+    bottom: 8px;
+    right: 20px;
+    font-size: 10px;
+    color: #555;
+  }
+  .keyboard-hint kbd {
+    padding: 1px 5px;
+    background: #2a2a4a;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 10px;
+    color: #888;
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="top-bar">
+  <h1>노미네 왕국 — Book Preview</h1>
+  <div class="book-info">250 x 200 mm (가로형) | Config-Driven</div>
+</div>
+
+<!-- Main Area -->
+<div class="main-area">
+  <!-- Left Panel: Controls -->
+  <div class="left-panel">
+    <div class="panel-section">
+      <h3>입력</h3>
+      <div class="input-group">
+        <label>아이 이름</label>
+        <input type="text" id="input-firstName" placeholder="도현" />
+      </div>
+      <div class="input-group">
+        <label>부모 호칭</label>
+        <input type="text" id="input-parentNames" placeholder="엄마 아빠" />
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>버전</h3>
+      <div class="version-switch">
+        <button class="version-btn active" data-version="A">A 베이비</button>
+        <button class="version-btn" data-version="B">B 키즈</button>
+      </div>
+      <div class="version-desc" id="version-label">베이비 모드 (0~4세)</div>
+    </div>
+
+    <div class="panel-section">
+      <h3>현재 페이지</h3>
+      <div class="page-info-card">
+        <div class="page-scene" id="page-title">—</div>
+        <div class="page-counter" id="page-counter">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel: Preview -->
+  <div class="right-panel">
+    <div class="page-viewer-wrap">
+      <div id="page-viewer"></div>
+    </div>
+    <div class="nav-arrows">
+      <button class="nav-btn" id="btn-prev">&#9664;</button>
+      <span class="nav-page-num" id="page-counter-bottom"></span>
+      <button class="nav-btn" id="btn-next">&#9654;</button>
+    </div>
+    <div class="keyboard-hint">
+      <kbd>&larr;</kbd> <kbd>&rarr;</kbd> 키보드로 이동
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Thumbnail Strip -->
+<div class="thumbnail-bar">
+  <div id="thumbnail-strip"></div>
+</div>
+
+<script src="js/bookPreviewApp.js"></script>
+</body>
+</html>
