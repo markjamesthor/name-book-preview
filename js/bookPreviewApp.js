@@ -75,7 +75,7 @@ function cacheDom() {
   els.mPrevBtn = document.getElementById('m-btn-prev');
   els.mNextBtn = document.getElementById('m-btn-next');
   els.thumbnailStrip = document.getElementById('thumbnail-strip');
-  els.versionLabel = document.getElementById('version-label');
+  // version-label removed — version info is in button text
   els.settingsBtn = document.getElementById('btn-settings');
   els.settingsOverlay = document.getElementById('settings-overlay');
   els.settingsBackdrop = document.getElementById('settings-backdrop');
@@ -355,7 +355,7 @@ function setupEvents() {
         .forEach(b => b.classList.add('active'));
       currentVersion = btn.dataset.version;
       currentPageIndex = 0;
-      if (els.versionLabel) els.versionLabel.textContent = config.versions[currentVersion].label;
+      // version label removed — info is in button text
       renderPage();
       renderThumbnails();
     });
