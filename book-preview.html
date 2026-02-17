@@ -176,6 +176,21 @@
     background: #111;
   }
 
+  /* ===== Carousel ===== */
+  .carousel-track {
+    display: flex;
+    width: 300%;
+    height: 100%;
+    will-change: transform;
+  }
+  .carousel-slide {
+    width: 33.333%;
+    height: 100%;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
   .page-bg-img {
     position: absolute;
     top: 0; left: 0;
@@ -188,14 +203,7 @@
     width: 100%; height: 100%;
   }
 
-  /* Scroll content wrapper */
-  .page-scroll-content {
-    position: relative;
-    width: 100%;
-    height: 100%;
-  }
-
-  /* Text overlay — inside scroll content, moves with image */
+  /* Text overlay */
   .page-text-overlay {
     position: absolute;
     left: 0; right: 0;
@@ -214,15 +222,6 @@
     line-height: 2.2;
     text-shadow: 0 1px 6px rgba(0,0,0,0.7);
     word-break: keep-all;
-  }
-
-  /* Page transition animation */
-  @keyframes pageFadeIn {
-    from { opacity: 0; transform: scale(1.02); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-  .page-fade-in {
-    animation: pageFadeIn 0.4s ease-out;
   }
 
   /* Desktop nav arrows (below viewer) */
@@ -351,39 +350,9 @@
     margin-bottom: 16px;
   }
 
-  /* ===== Scrollable image layer (mobile) ===== */
-  .page-scroll-area {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-  }
-
-  /* ===== Edge navigation hints ===== */
-  .edge-hint {
-    display: none;
-    position: absolute;
-    top: 0; bottom: 0;
-    width: 40px;
-    z-index: 20;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  .edge-hint.visible { opacity: 1; }
-  .edge-hint-left {
-    left: 0;
-    background: linear-gradient(90deg, rgba(201,160,255,0.25) 0%, transparent 100%);
-  }
-  .edge-hint-right {
-    right: 0;
-    background: linear-gradient(-90deg, rgba(201,160,255,0.25) 0%, transparent 100%);
-  }
-  .edge-hint-icon {
-    font-size: 18px;
-    color: rgba(255,255,255,0.85);
-    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  /* Carousel slide gap for visual separation */
+  .carousel-slide + .carousel-slide {
+    border-left: 3px solid #0f0f17;
   }
 
   /* ===== MOBILE (max-width: 768px) ===== */
@@ -425,46 +394,6 @@
     #page-viewer {
       border-radius: 10px;
     }
-
-    /* Scrollable image layer on mobile */
-    .page-scroll-area {
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-    }
-    .page-scroll-area::-webkit-scrollbar { display: none; }
-    .page-scroll-area { scrollbar-width: none; }
-
-    .page-scroll-content {
-      width: auto;
-      height: 100%;
-      display: inline-block;
-      min-width: 100%;
-    }
-
-    .page-scroll-area .page-bg-img {
-      position: relative;
-      width: auto;
-      height: 100%;
-      max-width: none;
-      display: block;
-    }
-
-    /* Gradient pages: fill viewer, no horizontal scroll */
-    .page-scroll-area .page-bg-gradient {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-    }
-
-    /* Text overlay spans the full content width on mobile */
-    .page-scroll-area .page-text-overlay {
-      left: 0; right: 0;
-      min-width: 100%;
-    }
-
-    /* Edge hints visible on mobile */
-    .edge-hint { display: flex; }
 
     /* Hide desktop nav arrows */
     .nav-arrows { display: none; }
@@ -600,11 +529,7 @@
   <!-- Right Panel: Preview -->
   <div class="right-panel">
     <div class="page-viewer-wrap">
-      <div id="page-viewer">
-        <!-- Touch zones for mobile tap navigation -->
-        <div class="touch-zone touch-zone-left" id="touch-prev"></div>
-        <div class="touch-zone touch-zone-right" id="touch-next"></div>
-      </div>
+      <div id="page-viewer"></div>
     </div>
     <div class="nav-arrows">
       <button class="nav-btn" id="btn-prev">&#9664;</button>

@@ -1,6 +1,6 @@
 /**
  * 노미네 왕국 — Book Preview Engine
- * Config-Driven 동화책 미리보기
+ * Config-Driven 동화책 미리보기 (Carousel)
  */
 
 // ========== Korean Language Helpers ==========
@@ -54,6 +54,7 @@ let config = null;
 let currentVersion = 'A';
 let currentPageIndex = 0;
 let variables = {};
+let isAnimating = false;
 
 // ========== DOM ==========
 const els = {};
@@ -75,7 +76,6 @@ function cacheDom() {
   els.mPrevBtn = document.getElementById('m-btn-prev');
   els.mNextBtn = document.getElementById('m-btn-next');
   els.thumbnailStrip = document.getElementById('thumbnail-strip');
-  // version-label removed — version info is in button text
   els.settingsBtn = document.getElementById('btn-settings');
   els.settingsOverlay = document.getElementById('settings-overlay');
   els.settingsBackdrop = document.getElementById('settings-backdrop');
@@ -106,7 +106,7 @@ async function loadConfig() {
   els.mParentNamesInput.value = pn;
 
   updateVariables();
-  renderPage();
+  renderCarousel();
   renderThumbnails();
 }
 
@@ -133,45 +133,21 @@ function syncInputs(source) {
   }
 }
 
-// ========== Navigation ==========
-
-function goPage(delta) {
-  const pages = getPages();
-  const next = currentPageIndex + delta;
-  if (next >= 0 && next < pages.length) {
-    currentPageIndex = next;
-    renderPage();
-  }
-}
-
-// ========== Page Rendering ==========
+// ========== Carousel ==========
 
 function getPages() {
   return config.versions[currentVersion].pages;
 }
 
-function centerScrollArea() {
-  const scrollArea = els.pageViewer.querySelector('.page-scroll-area');
-  if (!scrollArea) return;
-  const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
-  scrollArea.scrollLeft = maxScroll / 2;
-}
-
-function renderPage() {
+function buildSlideContent(pageIndex) {
   const pages = getPages();
-  if (currentPageIndex >= pages.length) currentPageIndex = pages.length - 1;
-  if (currentPageIndex < 0) currentPageIndex = 0;
+  if (pageIndex < 0 || pageIndex >= pages.length) return '';
 
-  const page = pages[currentPageIndex];
-  const viewer = els.pageViewer;
-
-  // Build illustration or gradient background inside scroll area
+  const page = pages[pageIndex];
   let bgHtml = '';
-  let hasImage = false;
   if (page.illustration && config.illustrations[page.illustration]) {
     const imgPath = config.illustrations[page.illustration];
     bgHtml = `<img class="page-bg-img" src="${imgPath}" alt="${page.title}" />`;
-    hasImage = true;
   } else if (page.bgGradient) {
     bgHtml = `<div class="page-bg-gradient" style="background:${page.bgGradient}"></div>`;
   }
@@ -180,47 +156,56 @@ function renderPage() {
   const textColor = page.textColor || 'white';
   const posClass = `text-pos-${page.textPosition || 'center'}`;
 
-  const canPrev = currentPageIndex > 0;
-  const canNext = currentPageIndex < pages.length - 1;
-
-  // Text overlay goes INSIDE scroll content so it moves with the image
-  const textOverlay = `
+  return `
+    ${bgHtml}
     <div class="page-text-overlay ${posClass}" style="color:${textColor}">
       <div class="page-story-text">${text.replace(/\n/g, '<br>')}</div>
     </div>`;
+}
 
-  viewer.innerHTML = `
-    <div class="page-scroll-area">
-      <div class="page-scroll-content page-fade-in">
-        ${bgHtml}
-        ${textOverlay}
-      </div>
-    </div>
-    <div class="edge-hint edge-hint-left" id="edge-left">
-      <span class="edge-hint-icon">${canPrev ? '◀' : ''}</span>
-    </div>
-    <div class="edge-hint edge-hint-right" id="edge-right">
-      <span class="edge-hint-icon">${canNext ? '▶' : ''}</span>
-    </div>
-  `;
+function renderCarousel() {
+  const pages = getPages();
+  if (currentPageIndex >= pages.length) currentPageIndex = pages.length - 1;
+  if (currentPageIndex < 0) currentPageIndex = 0;
 
-  // Center scroll on image load
-  const img = viewer.querySelector('.page-bg-img');
-  if (img) {
-    const onLoad = () => {
-      centerScrollArea();
-      setupScrollEdgeDetection();
-    };
-    img.addEventListener('load', onLoad);
-    if (img.complete) onLoad();
-  } else {
-    // Gradient page — no scroll needed, but still setup edge detection
-    setupScrollEdgeDetection();
+  const viewer = els.pageViewer;
+  viewer.innerHTML = '<div class="carousel-track" id="carousel-track"></div>';
+
+  const track = document.getElementById('carousel-track');
+  // Create 3 slides: [prev, current, next]
+  for (let i = -1; i <= 1; i++) {
+    const slide = document.createElement('div');
+    slide.className = 'carousel-slide';
+    slide.innerHTML = buildSlideContent(currentPageIndex + i);
+    track.appendChild(slide);
   }
 
-  // Update info displays
+  // Position to show center slide
+  track.style.transition = 'none';
+  track.style.transform = 'translateX(-33.333%)';
+
+  updatePageInfo();
+  setupCarouselTouch(track);
+}
+
+function populateSlides() {
+  const track = document.getElementById('carousel-track');
+  if (!track) return;
+  const slides = track.children;
+  for (let i = 0; i < 3; i++) {
+    slides[i].innerHTML = buildSlideContent(currentPageIndex + (i - 1));
+  }
+}
+
+function updatePageInfo() {
+  const pages = getPages();
+  const page = pages[currentPageIndex];
+  const canPrev = currentPageIndex > 0;
+  const canNext = currentPageIndex < pages.length - 1;
+
   const label = `${page.scene}. ${page.title}`;
   const counter = `${currentPageIndex + 1} / ${pages.length}`;
+
   els.pageTitle.textContent = label;
   els.pageCounter.textContent = counter;
   if (els.pageCounterBottom) els.pageCounterBottom.textContent = counter;
@@ -232,6 +217,7 @@ function renderPage() {
   if (els.mPrevBtn) els.mPrevBtn.disabled = !canPrev;
   if (els.mNextBtn) els.mNextBtn.disabled = !canNext;
 
+  // Highlight active thumbnail
   document.querySelectorAll('.thumb').forEach((t, i) => {
     t.classList.toggle('active', i === currentPageIndex);
   });
@@ -241,76 +227,172 @@ function renderPage() {
   }
 }
 
-// ========== Scroll Edge Detection → Page Transition ==========
+// ========== Carousel Navigation ==========
 
-function setupScrollEdgeDetection() {
-  const scrollArea = els.pageViewer.querySelector('.page-scroll-area');
-  if (!scrollArea) return;
+function goPage(delta) {
+  if (isAnimating) return;
+  const pages = getPages();
+  const next = currentPageIndex + delta;
+  if (next < 0 || next >= pages.length) return;
 
-  const edgeLeft = document.getElementById('edge-left');
-  const edgeRight = document.getElementById('edge-right');
-  const OVERSCROLL_THRESHOLD = 60;
-  let touchStartX = 0;
-  let touchStartScroll = 0;
-  let atEdge = null; // 'left' | 'right' | null
-  let overscrollDistance = 0;
-  let navigated = false;
+  isAnimating = true;
+  const track = document.getElementById('carousel-track');
+  if (!track) { isAnimating = false; return; }
 
-  scrollArea.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartScroll = scrollArea.scrollLeft;
-    atEdge = null;
-    overscrollDistance = 0;
-    navigated = false;
+  // Animate to target slide
+  track.style.transition = 'transform 0.35s ease-out';
+  const targetPercent = delta > 0 ? -66.666 : 0;
+  track.style.transform = `translateX(${targetPercent}%)`;
 
-    const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
-    if (scrollArea.scrollLeft <= 1) atEdge = 'left';
-    else if (scrollArea.scrollLeft >= maxScroll - 1) atEdge = 'right';
+  const finalize = () => {
+    currentPageIndex = next;
+    // Reset without animation
+    track.style.transition = 'none';
+    populateSlides();
+    track.style.transform = 'translateX(-33.333%)';
+    // Force reflow
+    track.offsetHeight;
+    updatePageInfo();
+    isAnimating = false;
+  };
+
+  track.addEventListener('transitionend', finalize, { once: true });
+  // Fallback if transitionend doesn't fire
+  setTimeout(() => { if (isAnimating) finalize(); }, 400);
+}
+
+function jumpToPage(targetIndex) {
+  if (isAnimating || targetIndex === currentPageIndex) return;
+  const pages = getPages();
+  if (targetIndex < 0 || targetIndex >= pages.length) return;
+
+  // Adjacent page → slide
+  const diff = targetIndex - currentPageIndex;
+  if (Math.abs(diff) === 1) {
+    goPage(diff);
+    return;
+  }
+
+  // Non-adjacent → crossfade
+  isAnimating = true;
+  const track = document.getElementById('carousel-track');
+  if (!track) { isAnimating = false; return; }
+
+  track.style.transition = 'opacity 0.25s ease-out';
+  track.style.opacity = '0';
+
+  setTimeout(() => {
+    currentPageIndex = targetIndex;
+    track.style.transition = 'none';
+    populateSlides();
+    track.style.transform = 'translateX(-33.333%)';
+    track.offsetHeight;
+
+    track.style.transition = 'opacity 0.25s ease-in';
+    track.style.opacity = '1';
+
+    updatePageInfo();
+    setTimeout(() => { isAnimating = false; }, 260);
+  }, 260);
+}
+
+// ========== Carousel Touch ==========
+
+function setupCarouselTouch(track) {
+  let startX = 0;
+  let startY = 0;
+  let isDragging = false;
+  let deltaX = 0;
+  let startTime = 0;
+
+  track.addEventListener('touchstart', (e) => {
+    if (isAnimating) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+    isDragging = false;
+    deltaX = 0;
+    track.style.transition = 'none';
   }, { passive: true });
 
-  scrollArea.addEventListener('touchmove', (e) => {
-    if (navigated) return;
+  track.addEventListener('touchmove', (e) => {
+    if (isAnimating) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
 
-    const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
-    const dx = e.touches[0].clientX - touchStartX;
+    // Determine direction on first significant move
+    if (!isDragging) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
+        isDragging = true;
+      } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+        return; // vertical scroll, don't interfere
+      } else {
+        return;
+      }
+    }
 
-    // Check if we're at the edge and swiping further
-    if (atEdge === 'left' && scrollArea.scrollLeft <= 1 && dx > 0) {
-      overscrollDistance = dx;
-      if (edgeLeft) edgeLeft.classList.toggle('visible', overscrollDistance > 20 && currentPageIndex > 0);
-      if (overscrollDistance > OVERSCROLL_THRESHOLD && currentPageIndex > 0) {
-        navigated = true;
-        if (edgeLeft) edgeLeft.classList.remove('visible');
-        goPage(-1);
-      }
-    } else if (atEdge === 'right' && scrollArea.scrollLeft >= maxScroll - 1 && dx < 0) {
-      overscrollDistance = Math.abs(dx);
-      const pages = getPages();
-      if (edgeRight) edgeRight.classList.toggle('visible', overscrollDistance > 20 && currentPageIndex < pages.length - 1);
-      if (overscrollDistance > OVERSCROLL_THRESHOLD && currentPageIndex < pages.length - 1) {
-        navigated = true;
-        if (edgeRight) edgeRight.classList.remove('visible');
-        goPage(1);
-      }
+    deltaX = dx;
+    const viewerWidth = els.pageViewer.clientWidth;
+    const pages = getPages();
+
+    // Rubber band at edges
+    let adjustedDx = deltaX;
+    if (currentPageIndex === 0 && deltaX > 0) adjustedDx = deltaX * 0.25;
+    if (currentPageIndex === pages.length - 1 && deltaX < 0) adjustedDx = deltaX * 0.25;
+
+    const baseOffset = -viewerWidth; // center slide position
+    track.style.transform = `translateX(${baseOffset + adjustedDx}px)`;
+  }, { passive: true });
+
+  track.addEventListener('touchend', () => {
+    if (!isDragging || isAnimating) return;
+
+    const viewerWidth = els.pageViewer.clientWidth;
+    const pages = getPages();
+    const velocity = Math.abs(deltaX) / (Date.now() - startTime); // px/ms
+    const threshold = viewerWidth * 0.2;
+    const fastSwipe = velocity > 0.4;
+
+    track.style.transition = 'transform 0.3s ease-out';
+
+    if ((deltaX < -threshold || (fastSwipe && deltaX < -30)) && currentPageIndex < pages.length - 1) {
+      // Swipe left → next
+      isAnimating = true;
+      track.style.transform = `translateX(-${viewerWidth * 2}px)`;
+
+      const finalize = () => {
+        currentPageIndex++;
+        track.style.transition = 'none';
+        populateSlides();
+        track.style.transform = 'translateX(-33.333%)';
+        track.offsetHeight;
+        updatePageInfo();
+        isAnimating = false;
+      };
+      track.addEventListener('transitionend', finalize, { once: true });
+      setTimeout(() => { if (isAnimating) finalize(); }, 350);
+
+    } else if ((deltaX > threshold || (fastSwipe && deltaX > 30)) && currentPageIndex > 0) {
+      // Swipe right → prev
+      isAnimating = true;
+      track.style.transform = 'translateX(0px)';
+
+      const finalize = () => {
+        currentPageIndex--;
+        track.style.transition = 'none';
+        populateSlides();
+        track.style.transform = 'translateX(-33.333%)';
+        track.offsetHeight;
+        updatePageInfo();
+        isAnimating = false;
+      };
+      track.addEventListener('transitionend', finalize, { once: true });
+      setTimeout(() => { if (isAnimating) finalize(); }, 350);
+
     } else {
-      // Not at edge anymore (user scrolled away)
-      atEdge = null;
-      if (edgeLeft) edgeLeft.classList.remove('visible');
-      if (edgeRight) edgeRight.classList.remove('visible');
+      // Snap back
+      track.style.transform = 'translateX(-33.333%)';
     }
-  }, { passive: true });
-
-  scrollArea.addEventListener('touchend', () => {
-    if (edgeLeft) edgeLeft.classList.remove('visible');
-    if (edgeRight) edgeRight.classList.remove('visible');
-
-    // Also detect edge-swipe for pages without scrollable content (gradients)
-    if (!navigated && scrollArea.scrollWidth <= scrollArea.clientWidth) {
-      const dx = overscrollDistance;
-      // We need to use the raw touch delta for non-scrollable pages
-    }
-    overscrollDistance = 0;
-    atEdge = null;
   }, { passive: true });
 }
 
@@ -332,10 +414,7 @@ function renderThumbnails() {
       thumb.innerHTML = `<div class="thumb-gradient" style="background:${page.bgGradient || '#333'}"></div><span class="thumb-label">${page.scene}</span>`;
     }
 
-    thumb.addEventListener('click', () => {
-      currentPageIndex = i;
-      renderPage();
-    });
+    thumb.addEventListener('click', () => jumpToPage(i));
     strip.appendChild(thumb);
   });
 }
@@ -343,10 +422,10 @@ function renderThumbnails() {
 // ========== Event Handlers ==========
 
 function setupEvents() {
-  els.firstNameInput.addEventListener('input', () => { syncInputs('desktop'); updateVariables(); renderPage(); });
-  els.parentNamesInput.addEventListener('input', () => { syncInputs('desktop'); updateVariables(); renderPage(); });
-  els.mFirstNameInput.addEventListener('input', () => { syncInputs('mobile'); updateVariables(); renderPage(); });
-  els.mParentNamesInput.addEventListener('input', () => { syncInputs('mobile'); updateVariables(); renderPage(); });
+  els.firstNameInput.addEventListener('input', () => { syncInputs('desktop'); updateVariables(); renderCarousel(); });
+  els.parentNamesInput.addEventListener('input', () => { syncInputs('desktop'); updateVariables(); renderCarousel(); });
+  els.mFirstNameInput.addEventListener('input', () => { syncInputs('mobile'); updateVariables(); renderCarousel(); });
+  els.mParentNamesInput.addEventListener('input', () => { syncInputs('mobile'); updateVariables(); renderCarousel(); });
 
   els.versionBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -355,8 +434,7 @@ function setupEvents() {
         .forEach(b => b.classList.add('active'));
       currentVersion = btn.dataset.version;
       currentPageIndex = 0;
-      // version label removed — info is in button text
-      renderPage();
+      renderCarousel();
       renderThumbnails();
     });
   });
@@ -378,34 +456,6 @@ function setupEvents() {
   if (els.settingsBackdrop) {
     els.settingsBackdrop.addEventListener('click', () => els.settingsOverlay.classList.remove('open'));
   }
-
-  // Swipe for gradient pages (no scroll content) on the viewer
-  setupViewerSwipe();
-}
-
-/** Fallback swipe for pages with no scrollable image (gradient-only) */
-function setupViewerSwipe() {
-  const viewer = els.pageViewer;
-  let startX = 0;
-  let startY = 0;
-
-  viewer.addEventListener('touchstart', (e) => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-
-  viewer.addEventListener('touchend', (e) => {
-    const scrollArea = viewer.querySelector('.page-scroll-area');
-    // Only use fallback swipe if there's no scrollable overflow
-    if (scrollArea && scrollArea.scrollWidth > scrollArea.clientWidth + 2) return;
-
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      if (dx < 0) goPage(1);
-      else goPage(-1);
-    }
-  }, { passive: true });
 }
 
 // ========== Init ==========
