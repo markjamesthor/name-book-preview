@@ -59,36 +59,23 @@ let variables = {};
 const els = {};
 
 function cacheDom() {
-  // Desktop inputs
   els.firstNameInput = document.getElementById('input-firstName');
   els.parentNamesInput = document.getElementById('input-parentNames');
-  // Mobile inputs
   els.mFirstNameInput = document.getElementById('m-input-firstName');
   els.mParentNamesInput = document.getElementById('m-input-parentNames');
-  // Version buttons (both desktop + mobile)
   els.versionBtns = document.querySelectorAll('.version-btn');
-  // Viewer
   els.pageViewer = document.getElementById('page-viewer');
-  // Desktop info
   els.pageTitle = document.getElementById('page-title');
   els.pageCounter = document.getElementById('page-counter');
   els.pageCounterBottom = document.getElementById('page-counter-bottom');
-  // Mobile info
   els.mPageTitle = document.getElementById('m-page-title');
   els.mPageCounter = document.getElementById('m-page-counter');
-  // Desktop nav
   els.prevBtn = document.getElementById('btn-prev');
   els.nextBtn = document.getElementById('btn-next');
-  // Mobile nav
   els.mPrevBtn = document.getElementById('m-btn-prev');
   els.mNextBtn = document.getElementById('m-btn-next');
-  // Touch zones
-  els.touchPrev = document.getElementById('touch-prev');
-  els.touchNext = document.getElementById('touch-next');
-  // Thumbnails
   els.thumbnailStrip = document.getElementById('thumbnail-strip');
   els.versionLabel = document.getElementById('version-label');
-  // Settings bottom sheet
   els.settingsBtn = document.getElementById('btn-settings');
   els.settingsOverlay = document.getElementById('settings-overlay');
   els.settingsBackdrop = document.getElementById('settings-backdrop');
@@ -111,7 +98,6 @@ async function loadConfig() {
     }
   }
 
-  // Set defaults on all inputs
   const fn = config.defaults.firstName;
   const pn = config.defaults.parentNames;
   els.firstNameInput.value = fn;
@@ -137,7 +123,6 @@ function updateVariables() {
   };
 }
 
-/** Sync desktop ↔ mobile inputs */
 function syncInputs(source) {
   if (source === 'desktop') {
     els.mFirstNameInput.value = els.firstNameInput.value;
@@ -165,6 +150,13 @@ function getPages() {
   return config.versions[currentVersion].pages;
 }
 
+function centerScrollArea() {
+  const scrollArea = els.pageViewer.querySelector('.page-scroll-area');
+  if (!scrollArea) return;
+  const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
+  scrollArea.scrollLeft = maxScroll / 2;
+}
+
 function renderPage() {
   const pages = getPages();
   if (currentPageIndex >= pages.length) currentPageIndex = pages.length - 1;
@@ -173,6 +165,7 @@ function renderPage() {
   const page = pages[currentPageIndex];
   const viewer = els.pageViewer;
 
+  // Build illustration or gradient background inside scroll area
   let bgHtml = '';
   if (page.illustration && config.illustrations[page.illustration]) {
     const imgPath = config.illustrations[page.illustration];
@@ -186,40 +179,51 @@ function renderPage() {
   const posClass = `text-pos-${page.textPosition || 'center'}`;
   const sceneBadge = `<span class="scene-badge">${page.scene}. ${page.title}</span>`;
 
+  const canPrev = currentPageIndex > 0;
+  const canNext = currentPageIndex < pages.length - 1;
+
   viewer.innerHTML = `
-    ${bgHtml}
+    <div class="page-scroll-area">${bgHtml}</div>
     <div class="page-text-overlay ${posClass}" style="color:${textColor}">
       ${sceneBadge}
       <div class="page-story-text">${text.replace(/\n/g, '<br>')}</div>
     </div>
-    <div class="touch-zone touch-zone-left" id="touch-prev"></div>
-    <div class="touch-zone touch-zone-right" id="touch-next"></div>
+    <div class="edge-hint edge-hint-left" id="edge-left">
+      <span class="edge-hint-icon">${canPrev ? '◀' : ''}</span>
+    </div>
+    <div class="edge-hint edge-hint-right" id="edge-right">
+      <span class="edge-hint-icon">${canNext ? '▶' : ''}</span>
+    </div>
   `;
 
-  // Re-bind touch zones (since innerHTML replaced them)
-  document.getElementById('touch-prev')?.addEventListener('click', () => goPage(-1));
-  document.getElementById('touch-next')?.addEventListener('click', () => goPage(1));
+  // Center scroll on image load
+  const img = viewer.querySelector('.page-bg-img');
+  if (img) {
+    const onLoad = () => {
+      centerScrollArea();
+      setupScrollEdgeDetection();
+    };
+    img.addEventListener('load', onLoad);
+    if (img.complete) onLoad();
+  } else {
+    // Gradient page — no scroll needed, but still setup edge detection
+    setupScrollEdgeDetection();
+  }
 
-  // Desktop info
+  // Update info displays
   const label = `${page.scene}. ${page.title}`;
   const counter = `${currentPageIndex + 1} / ${pages.length}`;
   els.pageTitle.textContent = label;
   els.pageCounter.textContent = counter;
   if (els.pageCounterBottom) els.pageCounterBottom.textContent = counter;
-
-  // Mobile info
   if (els.mPageTitle) els.mPageTitle.textContent = label;
   if (els.mPageCounter) els.mPageCounter.textContent = counter;
 
-  // Desktop nav buttons
-  els.prevBtn.disabled = currentPageIndex === 0;
-  els.nextBtn.disabled = currentPageIndex === pages.length - 1;
+  els.prevBtn.disabled = !canPrev;
+  els.nextBtn.disabled = !canNext;
+  if (els.mPrevBtn) els.mPrevBtn.disabled = !canPrev;
+  if (els.mNextBtn) els.mNextBtn.disabled = !canNext;
 
-  // Mobile nav buttons
-  if (els.mPrevBtn) els.mPrevBtn.disabled = currentPageIndex === 0;
-  if (els.mNextBtn) els.mNextBtn.disabled = currentPageIndex === pages.length - 1;
-
-  // Highlight active thumbnail
   document.querySelectorAll('.thumb').forEach((t, i) => {
     t.classList.toggle('active', i === currentPageIndex);
   });
@@ -228,6 +232,81 @@ function renderPage() {
     activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 }
+
+// ========== Scroll Edge Detection → Page Transition ==========
+
+function setupScrollEdgeDetection() {
+  const scrollArea = els.pageViewer.querySelector('.page-scroll-area');
+  if (!scrollArea) return;
+
+  const edgeLeft = document.getElementById('edge-left');
+  const edgeRight = document.getElementById('edge-right');
+  const OVERSCROLL_THRESHOLD = 60;
+  let touchStartX = 0;
+  let touchStartScroll = 0;
+  let atEdge = null; // 'left' | 'right' | null
+  let overscrollDistance = 0;
+  let navigated = false;
+
+  scrollArea.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartScroll = scrollArea.scrollLeft;
+    atEdge = null;
+    overscrollDistance = 0;
+    navigated = false;
+
+    const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
+    if (scrollArea.scrollLeft <= 1) atEdge = 'left';
+    else if (scrollArea.scrollLeft >= maxScroll - 1) atEdge = 'right';
+  }, { passive: true });
+
+  scrollArea.addEventListener('touchmove', (e) => {
+    if (navigated) return;
+
+    const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
+    const dx = e.touches[0].clientX - touchStartX;
+
+    // Check if we're at the edge and swiping further
+    if (atEdge === 'left' && scrollArea.scrollLeft <= 1 && dx > 0) {
+      overscrollDistance = dx;
+      if (edgeLeft) edgeLeft.classList.toggle('visible', overscrollDistance > 20 && currentPageIndex > 0);
+      if (overscrollDistance > OVERSCROLL_THRESHOLD && currentPageIndex > 0) {
+        navigated = true;
+        if (edgeLeft) edgeLeft.classList.remove('visible');
+        goPage(-1);
+      }
+    } else if (atEdge === 'right' && scrollArea.scrollLeft >= maxScroll - 1 && dx < 0) {
+      overscrollDistance = Math.abs(dx);
+      const pages = getPages();
+      if (edgeRight) edgeRight.classList.toggle('visible', overscrollDistance > 20 && currentPageIndex < pages.length - 1);
+      if (overscrollDistance > OVERSCROLL_THRESHOLD && currentPageIndex < pages.length - 1) {
+        navigated = true;
+        if (edgeRight) edgeRight.classList.remove('visible');
+        goPage(1);
+      }
+    } else {
+      // Not at edge anymore (user scrolled away)
+      atEdge = null;
+      if (edgeLeft) edgeLeft.classList.remove('visible');
+      if (edgeRight) edgeRight.classList.remove('visible');
+    }
+  }, { passive: true });
+
+  scrollArea.addEventListener('touchend', () => {
+    if (edgeLeft) edgeLeft.classList.remove('visible');
+    if (edgeRight) edgeRight.classList.remove('visible');
+
+    // Also detect edge-swipe for pages without scrollable content (gradients)
+    if (!navigated && scrollArea.scrollWidth <= scrollArea.clientWidth) {
+      const dx = overscrollDistance;
+      // We need to use the raw touch delta for non-scrollable pages
+    }
+    overscrollDistance = 0;
+    atEdge = null;
+  }, { passive: true });
+}
+
+// ========== Thumbnails ==========
 
 function renderThumbnails() {
   const pages = getPages();
@@ -256,104 +335,67 @@ function renderThumbnails() {
 // ========== Event Handlers ==========
 
 function setupEvents() {
-  // Desktop input changes
-  els.firstNameInput.addEventListener('input', () => {
-    syncInputs('desktop');
-    updateVariables();
-    renderPage();
-  });
-  els.parentNamesInput.addEventListener('input', () => {
-    syncInputs('desktop');
-    updateVariables();
-    renderPage();
-  });
+  els.firstNameInput.addEventListener('input', () => { syncInputs('desktop'); updateVariables(); renderPage(); });
+  els.parentNamesInput.addEventListener('input', () => { syncInputs('desktop'); updateVariables(); renderPage(); });
+  els.mFirstNameInput.addEventListener('input', () => { syncInputs('mobile'); updateVariables(); renderPage(); });
+  els.mParentNamesInput.addEventListener('input', () => { syncInputs('mobile'); updateVariables(); renderPage(); });
 
-  // Mobile input changes
-  els.mFirstNameInput.addEventListener('input', () => {
-    syncInputs('mobile');
-    updateVariables();
-    renderPage();
-  });
-  els.mParentNamesInput.addEventListener('input', () => {
-    syncInputs('mobile');
-    updateVariables();
-    renderPage();
-  });
-
-  // Version switch (all buttons, desktop + mobile)
   els.versionBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       els.versionBtns.forEach(b => b.classList.remove('active'));
-      // Activate both desktop and mobile buttons for this version
       document.querySelectorAll(`.version-btn[data-version="${btn.dataset.version}"]`)
         .forEach(b => b.classList.add('active'));
       currentVersion = btn.dataset.version;
       currentPageIndex = 0;
-      if (els.versionLabel) {
-        els.versionLabel.textContent = config.versions[currentVersion].label;
-      }
+      if (els.versionLabel) els.versionLabel.textContent = config.versions[currentVersion].label;
       renderPage();
       renderThumbnails();
     });
   });
 
-  // Desktop nav
   els.prevBtn.addEventListener('click', () => goPage(-1));
   els.nextBtn.addEventListener('click', () => goPage(1));
-
-  // Mobile nav
   if (els.mPrevBtn) els.mPrevBtn.addEventListener('click', () => goPage(-1));
   if (els.mNextBtn) els.mNextBtn.addEventListener('click', () => goPage(1));
 
-  // Keyboard navigation
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
     if (e.key === 'ArrowLeft') goPage(-1);
     else if (e.key === 'ArrowRight') goPage(1);
   });
 
-  // Settings bottom sheet
   if (els.settingsBtn) {
-    els.settingsBtn.addEventListener('click', () => {
-      els.settingsOverlay.classList.add('open');
-    });
+    els.settingsBtn.addEventListener('click', () => els.settingsOverlay.classList.add('open'));
   }
   if (els.settingsBackdrop) {
-    els.settingsBackdrop.addEventListener('click', () => {
-      els.settingsOverlay.classList.remove('open');
-    });
+    els.settingsBackdrop.addEventListener('click', () => els.settingsOverlay.classList.remove('open'));
   }
 
-  // Swipe gestures on page viewer
-  setupSwipe();
+  // Swipe for gradient pages (no scroll content) on the viewer
+  setupViewerSwipe();
 }
 
-// ========== Swipe Gesture ==========
-
-function setupSwipe() {
+/** Fallback swipe for pages with no scrollable image (gradient-only) */
+function setupViewerSwipe() {
   const viewer = els.pageViewer;
   let startX = 0;
   let startY = 0;
-  let tracking = false;
 
   viewer.addEventListener('touchstart', (e) => {
-    // Don't interfere with touch zones or scrolling
-    if (e.target.closest('.touch-zone')) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    tracking = true;
   }, { passive: true });
 
   viewer.addEventListener('touchend', (e) => {
-    if (!tracking) return;
-    tracking = false;
+    const scrollArea = viewer.querySelector('.page-scroll-area');
+    // Only use fallback swipe if there's no scrollable overflow
+    if (scrollArea && scrollArea.scrollWidth > scrollArea.clientWidth + 2) return;
+
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-
-    // Only horizontal swipes (dx > dy, and threshold > 40px)
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-      if (dx < 0) goPage(1);  // swipe left → next
-      else goPage(-1);         // swipe right → prev
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0) goPage(1);
+      else goPage(-1);
     }
   }, { passive: true });
 }

@@ -343,17 +343,40 @@
     margin-bottom: 16px;
   }
 
-  /* ===== Swipe touch zones (mobile) ===== */
-  .touch-zone {
+  /* ===== Scrollable image layer (mobile) ===== */
+  .page-scroll-area {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* ===== Edge navigation hints ===== */
+  .edge-hint {
     display: none;
     position: absolute;
     top: 0; bottom: 0;
-    width: 30%;
-    z-index: 15;
-    cursor: pointer;
+    width: 40px;
+    z-index: 20;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
   }
-  .touch-zone-left { left: 0; }
-  .touch-zone-right { right: 0; }
+  .edge-hint.visible { opacity: 1; }
+  .edge-hint-left {
+    left: 0;
+    background: linear-gradient(90deg, rgba(201,160,255,0.25) 0%, transparent 100%);
+  }
+  .edge-hint-right {
+    right: 0;
+    background: linear-gradient(-90deg, rgba(201,160,255,0.25) 0%, transparent 100%);
+  }
+  .edge-hint-icon {
+    font-size: 18px;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
 
   /* ===== MOBILE (max-width: 768px) ===== */
   @media (max-width: 768px) {
@@ -387,16 +410,33 @@
     .page-viewer-wrap {
       max-width: 100%;
       max-height: none;
-      flex: none;
-      aspect-ratio: 250 / 200;
+      flex: 1;
+      aspect-ratio: auto;
     }
 
     #page-viewer {
       border-radius: 10px;
     }
 
-    /* Touch zones on the viewer */
-    .touch-zone { display: block; }
+    /* Scrollable image layer on mobile */
+    .page-scroll-area {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+    .page-scroll-area::-webkit-scrollbar { display: none; }
+    .page-scroll-area { scrollbar-width: none; }
+
+    .page-scroll-area .page-bg-img {
+      position: relative;
+      width: auto;
+      height: 100%;
+      max-width: none;
+      display: block;
+    }
+
+    /* Edge hints visible on mobile */
+    .edge-hint { display: flex; }
 
     /* Hide desktop nav arrows */
     .nav-arrows { display: none; }
